@@ -17,16 +17,13 @@ on:
         required: false
         default: 'rector.php'
         type: string
-      rector_version:
-        description: 'Rector version.'
-        required: false
-        default: '0.18.5'
-        type: string
-      rector_laravel_version:
-        description: 'Rector Laravel plugin version.'
-        required: false
-        default: '0.26.1'
-        type: string
+    secrets:
+      SPARK_USER:
+        required: true
+        description: 'Laravel Spark username.'
+      SPARK_PASS:
+        required: true
+        description: 'Laravel Spark password.'
 
 permissions:
   contents: write
@@ -44,11 +41,40 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: mbstring, dom, fileinfo, intl, gd, exif, iconv, imagick, bcmath, soap, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Authenticate Spark
+        run: composer config http-basic.spark.laravel.com ${{ secrets.SPARK_USER }} ${{ secrets.SPARK_PASS }}
+
+      - name: Install Composer Dependencies
+        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Prepare Application
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+
       - name: Run Rector
-        uses: lemaur/rector-github-action@main
+        run: ./vendor/bin/rector process --config ${{ inputs.config_file }}
 
       - name: Commit Changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: ${{ inputs.commit_message }}
-
