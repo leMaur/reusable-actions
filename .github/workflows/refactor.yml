@@ -22,13 +22,6 @@ on:
         required: false
         default: '0.18.5'
         type: string
-    secrets:
-      SPARK_USER:
-        required: true
-        description: 'Laravel Spark username.'
-      SPARK_PASS:
-        required: true
-        description: 'Laravel Spark password.'
 
 permissions:
   contents: write
