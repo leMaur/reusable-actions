@@ -1,0 +1,41 @@
+name: Release Tracking (Sentry)
+
+on:
+  workflow_call:
+    inputs:
+      organisation:
+        description: 'Sentry Organisation Name.'
+        required: false
+        default: 'lemaur'
+        type: string
+      project:
+        description: 'Sentry Project Name.'
+        required: true
+        type: string
+      environment:
+        description: 'The environment this release has been deployed to.'
+        required: false
+        default: ${{ github.ref_name }}
+        type: string
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        description: 'Sentry Authentication Token.'
+        required: true
+
+jobs:
+  release-tracking:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Sentry Release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ inputs.organisation }}
+          SENTRY_PROJECT: ${{ inputs.project }}
+        with:
+          environment: ${{ inputs.environment }}
+          set_commits: auto
