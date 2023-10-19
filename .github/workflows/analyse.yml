@@ -1,0 +1,67 @@
+#
+# @see https://github.com/phpstan/phpstan
+#
+
+name: Analyse (Phpstan)
+
+on:
+  workflow_call:
+    inputs:
+      config_file:
+        description: 'Phpstan config file. [default: "phpstan.neon"]'
+        required: false
+        default: 'phpstan.neon'
+        type: string
+    secrets:
+      SPARK_USER:
+        required: true
+        description: 'Laravel Spark username.'
+      SPARK_PASS:
+        required: true
+        description: 'Laravel Spark password.'
+
+jobs:
+  analyse:
+    if: github.actor != 'dependabot[bot]'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: mbstring, dom, fileinfo, intl, gd, exif, iconv, imagick, bcmath, soap, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Authenticate Spark
+        run: composer config http-basic.spark.laravel.com ${{ secrets.SPARK_USER }} ${{ secrets.SPARK_PASS }}
+
+      - name: Install Composer Dependencies
+        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Prepare Application
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+
+      - name: Run Rector
+        run: ./vendor/bin/phpstan --error-format=github --configuration=${{ inputs.config_file }}
