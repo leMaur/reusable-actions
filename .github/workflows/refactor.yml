@@ -44,11 +44,8 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Install Rector
-        run: composer global require rector/rector:${{ inputs.rector_version }} driftingly/rector-laravel:${{ inputs.rector_laravel_version }} --dev --no-progress
-
       - name: Run Rector
-        run: /tmp/vendor/bin/rector process --config ${{ inputs.config_file }}
+        uses: lemaur/rector-github-action@main
 
       - name: Commit Changes
         uses: stefanzweifel/git-auto-commit-action@v4
