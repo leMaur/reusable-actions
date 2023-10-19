@@ -1,0 +1,84 @@
+name: Deploy (Vapor)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Vapor environment name. ["staging", "production"]'
+        required: false
+        default: ${{ github.ref_name }}
+        type: string
+    secrets:
+      SPARK_USER:
+        required: true
+        description: 'Laravel Spark Username.'
+      SPARK_PASS:
+        required: true
+        description: 'Laravel Spark Password.'
+      VAPOR_API_TOKEN:
+        required: true
+        description: 'Vapor API Token.'
+      SIDECAR_ACCESS_KEY_ID:
+        required: true
+        description: 'Sidecar Access Key ID'
+      SIDECAR_SECRET_ACCESS_KEY:
+        required: true
+        description: 'Sidecar Secret Access Key'
+      SIDECAR_ARTIFACT_BUCKET_NAME:
+        required: true
+        description: 'Sidecar Artifact Bucket Name'
+      SIDECAR_EXECUTION_ROLE:
+        required: true
+        description: 'Sidecar Execution Role'
+
+jobs:
+  deploy:
+    if: github.actor != 'dependabot[bot]'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    name: deploy on ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          tools: composer:v2
+          coverage: none
+
+      - name: Authenticate Spark
+        run: composer config http-basic.spark.laravel.com ${{ secrets.SPARK_USER }} ${{ secrets.SPARK_PASS }}
+
+      - name: Require Vapor CLI
+        run: composer global require laravel/vapor-cli
+
+      - name: Install Project Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare Application
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+
+      - name: Deploy
+        run: vapor deploy ${{ inputs.environment }} --commit="$CI_COMMIT_SHA" --message="$CI_MESSAGE"
+        env:
+          CI_COMMIT_SHA: ${{ github.sha }}
+          CI_MESSAGE: ${{ github.event.head_commit.message }}
+          VAPOR_API_TOKEN: ${{ secrets.VAPOR_API_TOKEN }}
+          SIDECAR_ACCESS_KEY_ID: ${{ secrets.SIDECAR_ACCESS_KEY_ID }}
+          SIDECAR_SECRET_ACCESS_KEY: ${{ secrets.SIDECAR_SECRET_ACCESS_KEY }}
+          SIDECAR_ARTIFACT_BUCKET_NAME: ${{ secrets.SIDECAR_ARTIFACT_BUCKET_NAME }}
+          SIDECAR_EXECUTION_ROLE: ${{ secrets.SIDECAR_EXECUTION_ROLE }}
