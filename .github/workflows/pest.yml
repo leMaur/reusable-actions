@@ -1,0 +1,90 @@
+#
+# @see https://github.com/pestphp/pest
+#
+
+name: Pest
+
+on:
+  workflow_call:
+    secrets:
+      SPARK_USER:
+        required: true
+        description: 'Laravel Spark username.'
+      SPARK_PASS:
+        required: true
+        description: 'Laravel Spark password.'
+
+jobs:
+  pest:
+    if: github.actor != 'dependabot[bot]'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      DB_DATABASE: testing
+      DB_USERNAME: testing
+      DB_PASSWORD: password
+
+    services:
+      postgres:
+        image: postgres:13.4
+        env:
+          POSTGRES_DB: ${{ env.DB_DATABASE }}
+          POSTGRES_USER: ${{ env.DB_USERNAME }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: mbstring, dom, fileinfo, intl, gd, exif, iconv, imagick, bcmath, soap, zip
+          tools: composer:v2
+          coverage: pcov
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Authenticate Spark
+        run: composer config http-basic.spark.laravel.com ${{ secrets.SPARK_USER }} ${{ secrets.SPARK_PASS }}
+
+      - name: Install Composer Dependencies
+        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Prepare Application
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+          php artisan optimize:clear
+
+      - name: Run Tests
+        run: ./vendor/bin/pest --exclude-group=e2e --order-by=random --stop-on-failure --parallel --coverage --min=20 --coverage-html=.coverage --coverage-clover=coverage.xml
+        env:
+          DB_DATABASE: ${{ env.DB_DATABASE }}
+          DB_USERNAME: ${{ env.DB_USERNAME }}
+          DB_PASSWORD: ${{ env.DB_PASSWORD }}
+
+#      - name: Upload Coverage Report
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: coverage-report
+#          path: |
+#            coverage.xml
+#            .coverage/
