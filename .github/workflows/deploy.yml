@@ -10,10 +10,10 @@ on:
         type: string
     secrets:
       SPARK_USER:
-        required: true
+        required: false
         description: 'Laravel Spark Username.'
       SPARK_PASS:
-        required: true
+        required: false
         description: 'Laravel Spark Password.'
       VAPOR_API_TOKEN:
         required: true
