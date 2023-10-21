@@ -61,7 +61,10 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Authenticate Spark
-        if: secrets.SPARK_USER != '' && secrets.SPARK_PASS != ''
+        env:
+          spark_user: ${{ secrets.SPARK_USER }}
+          spark_pass: ${{ secrets.SPARK_PASS }}
+        if: ${{ env.spark_user != '' }} && ${{ env.spark_pass != '' }}
         run: composer config http-basic.spark.laravel.com ${{ secrets.SPARK_USER }} ${{ secrets.SPARK_PASS }}
 
       - name: Install Composer Dependencies
