@@ -14,10 +14,10 @@ on:
         type: string
     secrets:
       SPARK_USER:
-        required: true
+        required: false
         description: 'Laravel Spark username.'
       SPARK_PASS:
-        required: true
+        required: false
         description: 'Laravel Spark password.'
 
 jobs:
